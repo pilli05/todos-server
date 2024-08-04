@@ -10,7 +10,7 @@ const fs = require("fs");
 const path = require("path");
 dotenv.config();
 
-const PORT = 5000;
+const PORT = process.env.PORT;
 const secretKey = process.env.USER_SECRET_KEY;
 
 app.use(cors());
