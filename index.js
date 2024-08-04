@@ -10,7 +10,7 @@ const fs = require("fs");
 const path = require("path");
 dotenv.config();
 
-const PORT = process.env.PORT;
+const PORT = 5000;
 const secretKey = process.env.USER_SECRET_KEY;
 
 app.use(cors());
@@ -35,6 +35,26 @@ db.serialize(() => {
     "CREATE TABLE IF NOT EXISTS todo (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, description TEXT, status TEXT)"
   );
 });
+
+const authenticateUser = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+  console.log(authHeader);
+  if (token === null)
+    return res
+      .status(401)
+      .send({ status: false, message: "Unauthorized User" });
+  jwt.verify(token, secretKey, (err, user) => {
+    if (err) {
+      return res
+        .status(401)
+        .send({ status: false, message: "Unauthorized User" });
+    } else {
+      req.user = user;
+      next();
+    }
+  });
+};
 
 app.post("/register", (req, res) => {
   const { username, password } = req.body;
@@ -110,7 +130,7 @@ app.post("/login", (req, res) => {
   });
 });
 
-app.post("/todos", (req, res) => {
+app.post("/todos", authenticateUser, (req, res) => {
   const { status, description, user_id } = req.body;
 
   db.run(
@@ -127,8 +147,9 @@ app.post("/todos", (req, res) => {
   );
 });
 
-app.get("/todos", (req, res) => {
-  db.all("SELECT * FROM todo", (err, rows) => {
+app.get("/todos", authenticateUser, (req, res) => {
+  const user_id = req.user.id;
+  db.all("SELECT * FROM todo WHERE user_id = ?", [user_id], (err, rows) => {
     if (err) {
       return res.status(500).send({ message: "Internal Server Error" });
     }
@@ -137,7 +158,7 @@ app.get("/todos", (req, res) => {
   });
 });
 
-app.get("/todos/:id", (req, res) => {
+app.get("/todos/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   db.get("SELECT * FROM todo WHERE id = ?", [id], (err, row) => {
     if (err) {
@@ -150,7 +171,7 @@ app.get("/todos/:id", (req, res) => {
   });
 });
 
-app.put("/todos/:id", (req, res) => {
+app.put("/todos/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   const { status, description } = req.body;
   db.run(
@@ -167,7 +188,7 @@ app.put("/todos/:id", (req, res) => {
   );
 });
 
-app.delete("/todos/:id", (req, res) => {
+app.delete("/todos/:id", authenticateUser, (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM todo WHERE id = ?", [id], (err) => {
     if (err) {
